@@ -11,7 +11,8 @@
 #include <netinet/ip.h>         // ip 헤더 구조체
 #include <netinet/tcp.h>        // tcp header 구조체
 #include <netinet/in.h>         // in_addr 구조체
-//#include <arpa/inet.h>          // inet_ntop를 위한 헤더파일인데 왜 주석 떼면 오류가 뜨지.. 충돌인가..
+#include <arpa/inet.h>          // inet_ntop를 위한 헤더파일인데 왜 주석 떼면 오류가 뜨지.. 충돌인가..
+                                // 바보다. 함수 인자값 확인은 필수다.
 
 int main(int argc, char *argv[])
 {
@@ -62,16 +63,22 @@ int main(int argc, char *argv[])
 
 
         // IPv4는 0800이니까, 0800과 EtherType이 같으면 상위 계층 IP로.
+        // ntop를 쓰려니까 인자값을 다 넣어줘야해.
         if(0x0800 == ntohs(ethHdr->ether_type)){        // ntohs는 2바이트(s)의 네트워크바이트(Big endian)을 호스트바이트(Little endian)로 변환시켜 줌.
+            struct in_addr src_ip = ipHdr->ip_src;      // 맞춰서 넣기 위해.
+            struct in_addr dst_ip = ipHdr->ip_dst;
+            char s_len[16];                             // 3번째 인자에 넣을 값.
+            char d_len[16];
             printf("S.IP: ");
-            printf("%s\t\t\t", inet_ntop(ipHdr->ip_src));
+            printf("%s\t\t\t", inet_ntop(AF_INET, (void *)&src_ip, s_len, 24));
             // ip 헤더의 in_addr 구조체 안의 ip_scr로 Src IP를 가져올 수 있음.
             // vs. total length: IP datagram이나 IP fragment의 전체 길이.
+
             // inet_ntop는 ip주소의 32비트의 Hexadecimal값을 dotted-decimal로 변환시켜 줌. char*형이니 %S로 받음.
             // inet_ntop는 inet_ntoa의 확장된 버전. IPv6까지 다 카바쳐줌. -> ntop를 쓰자.
+            // const char *inet_ntop(int af, const void *src, char *dst, socklen_t size);
             printf("D.IP: ");
-            printf("%s\n", inet_ntop(ipHdr->ip_dst));
-
+            printf("%s\n", inet_ntop(AF_INET, (void *)&dst_ip, d_len, 24));
             where += (ipHdr->ip_hl) * 4;             // ip header 뒤에 TCP 또는 UDP가 오기때문에 위치 변경을 위해
             // 위치 저장 변수 where에 총 ip 헤더의 길이를 더함 (IPv4는 가변적: 20-60B. IPv6는 320bits로 고정이라 필요없음.)
             // ipv4의 header length는 4바이트(32bit). 필드값은 대부분 5임. Default: 20B)
@@ -92,15 +99,12 @@ int main(int argc, char *argv[])
                     if (count % 16 == 0 && count != 0)  // 16개를 다 읽고 count가 남아있다면 단락을 나눔.
                         printf("\n");
                 }
-                printf("\n ===> Length of Data: %d\n", count);  // 길이 count.
+                printf("\n\t\t\t ===> Length of Data: %d\n", count);  // 길이 count.
             }
         }
         printf("\n");   // 반복이 되므로 가독성을 위한 구분선과 띄어쓰기를 해줌
         printf("=========================================================================\n");
     }
-
     pcap_close(handle); // 종료 전 열어둔 handle을 닫기 !!
     return 0;
 }
-
-
